@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Forum from './pages/Forum';
 import Profile from './pages/Profile';
+import API_URL from './config/api';
 
 function App() {
   const [user, setUser] = useState(null);

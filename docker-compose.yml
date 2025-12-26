@@ -1,87 +1,35 @@
 version: '3.8'
 
 services:
-  # MySQL Database
-  database:
-    image: mysql:8.0
-    container_name: forum-db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - forum-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Backend API
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: forum-backend
-    restart: always
-    depends_on:
-      database:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      PORT: 5001
-      DB_HOST: database
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      JWT_SECRET: ${JWT_SECRET}
     ports:
       - "5001:5001"
-    volumes:
-      - ./backend/logs:/app/logs
-    networks:
-      - forum-network
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - ./backend/.env
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-
-  # Frontend (Nginx)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: forum-frontend
-    restart: always
-    depends_on:
-      - backend
-    ports:
-      - "80:80"
     networks:
       - forum-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
+
+  frontend:
+    build: ./frontend
+    container_name: forum-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - forum-network
 
 networks:
   forum-network:
     driver: bridge
-
-volumes:
-  mysql_data:
-    driver: local

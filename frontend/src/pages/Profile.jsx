@@ -19,7 +19,7 @@ function Profile({ user, token, onLogout }) {
   const fetchProfile = async () => {
     try {
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const response = await axios.get(`http://localhost:5001/api/users/${id}`, config);
+      const response = await axios.get(`http://54.251.94.68:5001/api/users/${id}`, config);
       if (response.data.success) {
         setProfileUser(response.data.user);
         setEmail(response.data.user.email || '');
@@ -42,7 +42,7 @@ function Profile({ user, token, onLogout }) {
       }
 
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      const response = await axios.put(`http://localhost:5001/api/users/${id}`, updateData, config);
+      const response = await axios.put(`http://54.251.94.68:5001/api/users/${id}`, updateData, config);
 
       if (response.data.success) {
         setMessage(' Profile updated successfully!');
