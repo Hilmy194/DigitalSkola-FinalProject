@@ -69,13 +69,13 @@ jobs:
     
     - name: Deploy Backend
       run: |
-        echo "🚀 Backend deployment would happen here"
+        echo "Backend deployment would happen here"
         echo "Example: Deploy to Railway, Render, or AWS"
     
     - name: Deploy Frontend
       run: |
-        echo "🚀 Frontend deployment would happen here"
+        echo "Frontend deployment would happen here"
         echo "Example: Deploy to Vercel or Netlify"
     
     - name: Notify Deployment Success
-      run: echo "✅ Deployment completed successfully!"
+      run: echo "Deployment completed successfully!"

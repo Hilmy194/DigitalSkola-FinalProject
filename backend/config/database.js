@@ -1,64 +1,38 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const mysql = require('mysql2/promise');
+require('dotenv').config();
 
-const dbPath = path.join(__dirname, '..', 'secure_forum.db');
-
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Database connection error:', err);
-  } else {
-    console.log('Database connected successfully');
-  }
+// Create MySQL connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 // SECURE: Parameterized queries prevent SQL injection
-const query = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    if (sql.trim().toUpperCase().startsWith('SELECT') || sql.trim().toUpperCase().startsWith('WITH')) {
-      db.all(sql, params, (err, rows) => {
-        if (err) reject(err);
-        else resolve({ rows });
-      });
-    } else if (sql.trim().toUpperCase().startsWith('INSERT')) {
-      db.run(sql, params, function(err) {
-        if (err) reject(err);
-        else resolve({ rows: [{ id: this.lastID }] });
-      });
-    } else if (sql.trim().toUpperCase().startsWith('UPDATE') && sql.toUpperCase().includes('RETURNING')) {
-      const updateSql = sql.split(/RETURNING/i)[0].trim();
-      const returningCols = sql.split(/RETURNING/i)[1].trim();
-      
-      db.run(updateSql, params, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          const changes = this.changes;
-          if (changes > 0) {
-            const whereMatch = updateSql.match(/WHERE\s+(.+?)(?:$|;)/i);
-            if (whereMatch) {
-              const whereClause = whereMatch[1];
-              const selectSql = `SELECT ${returningCols} FROM users WHERE ${whereClause}`;
-              const selectParams = params.slice(-1);
-              
-              db.all(selectSql, selectParams, (err, rows) => {
-                if (err) reject(err);
-                else resolve({ rows, rowCount: changes });
-              });
-            } else {
-              resolve({ rows: [], rowCount: changes });
-            }
-          } else {
-            resolve({ rows: [], rowCount: 0 });
-          }
-        }
-      });
-    } else {
-      db.run(sql, params, function(err) {
-        if (err) reject(err);
-        else resolve({ rows: [], rowCount: this.changes });
-      });
+const query = async (sql, params = []) => {
+  try {
+    const [rows] = await pool.execute(sql, params);
+    
+    // For INSERT queries, return the inserted ID
+    if (sql.trim().toUpperCase().startsWith('INSERT')) {
+      return { rows: [{ id: rows.insertId }] };
     }
-  });
+    
+    // For UPDATE/DELETE, return affected rows count
+    if (sql.trim().toUpperCase().startsWith('UPDATE') || sql.trim().toUpperCase().startsWith('DELETE')) {
+      return { rows, rowCount: rows.affectedRows };
+    }
+    
+    // For SELECT queries, return rows
+    return { rows };
+  } catch (error) {
+    console.error('Database query error:', error.message);
+    throw error;
+  }
 };
 
-module.exports = { query, db };
+module.exports = { query, pool };

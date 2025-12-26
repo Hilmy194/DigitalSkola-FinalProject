@@ -1,109 +1,117 @@
-const sqlite3 = require('sqlite3').verbose();
+const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
-const path = require('path');
+require('dotenv').config();
 
-const dbPath = path.join(__dirname, 'secure_forum.db');
+async function setupDatabase() {
+  try {
+    // Connect to MySQL
+    const connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    });
 
-const db = new sqlite3.Database(dbPath, async (err) => {
-  if (err) {
-    console.error('Error creating database:', err);
-    return;
-  }
+    console.log('Database connected successfully');
 
-  console.log('Creating secure database...');
-
-  // Create users table
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      email TEXT,
-      role TEXT DEFAULT 'user',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `, async (err) => {
-    if (err) {
-      console.error('Error creating users table:', err);
-      return;
-    }
+    // Create users table
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        email VARCHAR(100),
+        role VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Users table created');
 
     // Create posts table
-    db.run(`
+    await connection.execute(`
       CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        title VARCHAR(255) NOT NULL,
         content TEXT NOT NULL,
-        user_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        user_id INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
-    `, async (err) => {
-      if (err) {
-        console.error('Error creating posts table:', err);
-        return;
+    `);
+    console.log('Posts table created');
+
+    // Hash passwords for all users
+    const hilmyPass = await bcrypt.hash('hilmy123', 10);
+    const andiPass = await bcrypt.hash('andi123', 10);
+    const dikaPass = await bcrypt.hash('dika123', 10);
+    const aliyaPass = await bcrypt.hash('aliya123', 10);
+    const putriPass = await bcrypt.hash('putri123', 10);
+    const rezaPass = await bcrypt.hash('reza123', 10);
+
+    // Insert users with hashed passwords
+    const users = [
+      ['hilmy', hilmyPass, 'hilmy@forum.com', 'admin'],
+      ['andi', andiPass, 'andi@example.com', 'user'],
+      ['dika', dikaPass, 'dika@example.com', 'user'],
+      ['aliya', aliyaPass, 'aliya@nyoba.com', 'user'],
+      ['putri', putriPass, 'putri@contoh.com', 'user'],
+      ['reza', rezaPass, 'reza@example.com', 'user']
+    ];
+
+    for (const user of users) {
+      try {
+        await connection.execute(
+          'INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)',
+          user
+        );
+      } catch (err) {
+        if (err.code !== 'ER_DUP_ENTRY') {
+          console.error('Error inserting user:', err.message);
+        }
       }
+    }
+    console.log('Sample users inserted');
 
-      // Hash passwords for all users
-      const hilmyPass = await bcrypt.hash('hilmy123', 10);
-      const andiPass = await bcrypt.hash('andi123', 10);
-      const dikaPass = await bcrypt.hash('dika123', 10);
-      const aliyaPass = await bcrypt.hash('aliya123', 10);
-      const putriPass = await bcrypt.hash('putri123', 10);
-      const rezaPass = await bcrypt.hash('reza123', 10);
+    // Insert sample posts
+    const posts = [
+      ['Selamat Datang di Forum Aman', 'Forum ini sudah diamankan dari SQL Injection dan IDOR', 1],
+      ['Tips Keamanan Web', 'Selalu gunakan parameterized queries dan validasi input', 1],
+      ['Belajar Cybersecurity', 'Penting untuk memahami vulnerability sebelum mengamankannya', 2],
+      ['Pengalaman Pertama', 'Ini adalah post pertama saya di forum ini', 3],
+      ['Diskusi Teknologi', 'Mari diskusi tentang teknologi terbaru', 4],
+      ['Sharing Knowledge', 'Berbagi ilmu adalah hal yang baik', 5],
+      ['Project Baru', 'Sedang mengerjakan project keamanan web', 6]
+    ];
 
-      // Insert users with hashed passwords
-      const users = [
-        ['hilmy', hilmyPass, 'hilmy@forum.com', 'admin'],
-        ['andi', andiPass, 'andi@example.com', 'user'],
-        ['dika', dikaPass, 'dika@example.com', 'user'],
-        ['aliya', aliyaPass, 'aliya@nyoba.com', 'user'],
-        ['putri', putriPass, 'putri@contoh.com', 'user'],
-        ['reza', rezaPass, 'reza@example.com', 'user']
-      ];
-
-      const insertUser = db.prepare('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)');
-      
-      for (const user of users) {
-        insertUser.run(user, (err) => {
-          if (err) console.error('Error inserting user:', err);
-        });
+    for (const post of posts) {
+      try {
+        await connection.execute(
+          'INSERT INTO posts (title, content, user_id) VALUES (?, ?, ?)',
+          post
+        );
+      } catch (err) {
+        console.error('Error inserting post:', err.message);
       }
-      
-      insertUser.finalize();
+    }
+    console.log('Sample posts inserted');
 
-      // Insert sample posts
-      const posts = [
-        ['Selamat Datang di Forum Aman', 'Forum ini sudah diamankan dari SQL Injection dan IDOR', 1],
-        ['Tips Keamanan Web', 'Selalu gunakan parameterized queries dan validasi input', 1],
-        ['Belajar Cybersecurity', 'Penting untuk memahami vulnerability sebelum mengamankannya', 2],
-        ['Pengalaman Pertama', 'Ini adalah post pertama saya di forum ini', 3],
-        ['Diskusi Teknologi', 'Mari diskusi tentang teknologi terbaru', 4],
-        ['Sharing Knowledge', 'Berbagi ilmu adalah hal yang baik', 5],
-        ['Project Baru', 'Sedang mengerjakan project keamanan web', 6]
-      ];
-
-      const insertPost = db.prepare('INSERT INTO posts (title, content, user_id) VALUES (?, ?, ?)');
-      
-      for (const post of posts) {
-        insertPost.run(post, (err) => {
-          if (err) console.error('Error inserting post:', err);
-        });
-      }
-      
-      insertPost.finalize();
-
-      console.log('✓ Database setup complete!');
-      console.log('✓ All passwords are hashed with bcrypt');
-      console.log('\nTest accounts:');
-      console.log('- hilmy / hilmy123 (admin)');
-      console.log('- andi / andi123');
+    await connection.end();
+    
+    console.log('\n✓ Database setup complete!');
+    console.log('✓ All passwords are hashed with bcrypt');
+    console.log('\nTest accounts:');
+    console.log('- hilmy / hilmy123 (admin)');
+    console.log('- andi / andi123');
       console.log('- dika / dika123');
       console.log('- aliya / aliya123');
       console.log('- putri / putri123');
       console.log('- reza / reza123');
+    
+  } catch (error) {
+    console.error('Database setup failed:', error.message);
+    process.exit(1);
+  }
+}
 
-      db.close();
-    });
-  });
-});
+setupDatabase();
